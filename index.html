@@ -1,0 +1,1030 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>매장 매출 분석 대시보드</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+:root{
+  --bg:#0e0f11;--bg2:#161719;--bg3:#1e2023;--bg4:#25282d;
+  --border:rgba(255,255,255,.07);--border2:rgba(255,255,255,.13);--border3:rgba(255,255,255,.22);
+  --text:#f0f0ee;--text2:#9a9a96;--text3:#4e4e4a;
+  --accent:#c8f542;--accent2:#a8d032;
+  --blue:#4a9eff;--amber:#f5a623;--red:#ff5e5e;--green:#4ecb71;--teal:#2dd4bf;
+  --radius:12px;--radius-sm:8px;
+  --font:'Noto Sans KR',sans-serif;--mono:'DM Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.6}
+
+/* HEADER */
+.header{position:sticky;top:0;z-index:200;background:rgba(14,15,17,.94);backdrop-filter:blur(18px);border-bottom:1px solid var(--border);padding:0 2rem;display:flex;align-items:center;justify-content:space-between;height:56px}
+.logo{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:600;letter-spacing:-.01em;cursor:default}
+.logo-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent);animation:blink 2.4s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+.hdr-right{display:flex;align-items:center;gap:8px}
+.hdr-btn{display:flex;align-items:center;gap:6px;border:1px solid var(--border2);background:transparent;color:var(--text2);border-radius:var(--radius-sm);padding:6px 13px;font-size:12px;font-weight:500;cursor:pointer;font-family:var(--font);transition:all .15s}
+.hdr-btn:hover{border-color:var(--border3);color:var(--text);background:var(--bg3)}
+.hdr-btn.primary{background:var(--accent);color:#0e0f11;border-color:transparent}
+.hdr-btn.primary:hover{background:var(--accent2)}
+.status-dot{width:7px;height:7px;border-radius:50%;background:var(--text3)}
+.status-dot.ok{background:var(--green);box-shadow:0 0 6px var(--green)}
+.data-chip{display:flex;align-items:center;gap:6px;font-size:11px;font-family:var(--mono);background:var(--bg3);border:1px solid var(--border);color:var(--text2);border-radius:20px;padding:4px 10px}
+
+/* NAV */
+.nav-wrap{border-bottom:1px solid var(--border);padding:0 2rem;background:var(--bg);position:sticky;top:56px;z-index:190}
+.nav{display:flex;overflow-x:auto;scrollbar-width:none}
+.nav::-webkit-scrollbar{display:none}
+.nav-tab{flex:0 0 auto;padding:12px 18px;font-size:13px;font-weight:400;color:var(--text3);cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;margin-bottom:-1px;font-family:var(--font);transition:all .15s;white-space:nowrap}
+.nav-tab:hover{color:var(--text2)}
+.nav-tab.active{color:var(--text);border-bottom-color:var(--accent);font-weight:500}
+
+/* PANELS */
+.panel{display:none;animation:fadeUp .18s ease}
+.panel.active{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+.page{max-width:1280px;margin:0 auto;padding:2rem}
+
+/* EMPTY STATE (upload-first) */
+.empty-page{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:calc(100vh - 112px);padding:2rem;text-align:center;
+}
+.empty-icon-wrap{
+  width:80px;height:80px;border-radius:50%;
+  border:1.5px dashed var(--border2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:32px;margin-bottom:1.5rem;
+  animation:float 3s ease-in-out infinite;
+}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+.empty-title{font-size:20px;font-weight:600;letter-spacing:-.02em;margin-bottom:.5rem}
+.empty-sub{font-size:13px;color:var(--text2);margin-bottom:2rem;max-width:360px;line-height:1.7}
+.upload-main-btn{
+  display:inline-flex;align-items:center;gap:8px;
+  background:var(--accent);color:#0e0f11;
+  border:none;border-radius:var(--radius);
+  padding:12px 28px;font-size:14px;font-weight:600;
+  cursor:pointer;font-family:var(--font);transition:all .2s;
+  margin-bottom:1rem;
+}
+.upload-main-btn:hover{background:var(--accent2);transform:translateY(-1px)}
+.upload-hint{font-size:11px;color:var(--text3);margin-bottom:2.5rem}
+.col-guide{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:8px;
+  max-width:500px;width:100%;margin:0 auto;
+}
+.col-chip{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--radius-sm);padding:.625rem .875rem;
+  font-size:11.5px;text-align:left;
+}
+.col-chip-name{font-family:var(--mono);color:var(--accent);font-size:11px;margin-bottom:2px}
+.col-chip-ex{font-size:10.5px;color:var(--text3)}
+.req-label{font-size:10px;font-weight:600;letter-spacing:.06em;color:var(--text3);text-transform:uppercase;margin-bottom:.625rem;text-align:left;max-width:500px;width:100%}
+
+/* CARDS / BOXES */
+.metric-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1.5rem}
+.metric{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:1.125rem 1.25rem;position:relative;overflow:hidden;transition:border-color .2s}
+.metric:hover{border-color:var(--border2)}
+.metric::after{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent);opacity:0;transition:opacity .2s}
+.metric:hover::after{opacity:1}
+.m-lbl{font-size:11px;color:var(--text3);margin-bottom:5px;letter-spacing:.03em}
+.m-val{font-size:22px;font-weight:600;letter-spacing:-.02em;font-family:var(--mono)}
+.m-sub{font-size:11px;margin-top:3px}
+.up{color:var(--green)}.down{color:var(--red)}.neutral{color:var(--text3)}
+.box{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem}
+.box-title{font-size:13px;font-weight:500;margin-bottom:1rem;display:flex;align-items:center;gap:8px}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.chart-wrap{position:relative;width:100%}
+.sec-lbl{font-size:10px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:.75rem}
+
+/* BADGES */
+.badge{display:inline-block;font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;font-family:var(--mono);letter-spacing:.02em}
+.b-g{background:rgba(78,203,113,.14);color:var(--green)}
+.b-a{background:rgba(245,166,35,.14);color:var(--amber)}
+.b-b{background:rgba(74,158,255,.14);color:var(--blue)}
+.b-r{background:rgba(255,94,94,.14);color:var(--red)}
+.b-n{background:var(--bg4);color:var(--text2)}
+
+/* INSIGHT LIST */
+.ilist{list-style:none;display:flex;flex-direction:column;gap:8px}
+.ilist li{font-size:12.5px;color:var(--text2);line-height:1.55;padding:9px 12px;background:var(--bg3);border-radius:var(--radius-sm);border-left:2px solid var(--border2);transition:border-color .15s}
+.ilist li:hover{border-left-color:var(--accent)}
+
+/* HEATMAP */
+.hm-wrap{overflow-x:auto;margin-top:.5rem}
+.hm{border-collapse:separate;border-spacing:3px;font-size:11px;width:100%}
+.hm th{padding:6px 4px;color:var(--text3);font-weight:400;text-align:center;font-size:11px;white-space:nowrap}
+.hm th:first-child{text-align:left;min-width:64px}
+.hm td{padding:7px 4px;text-align:center;border-radius:5px;font-size:10.5px;font-weight:500;min-width:50px;cursor:default;transition:opacity .15s}
+.hm td:hover{opacity:.7}
+.hm0{background:#1e2023;color:var(--text3)}
+.hm1{background:rgba(200,245,66,.11);color:#c8f542}
+.hm2{background:rgba(200,245,66,.27);color:#c8f542}
+.hm3{background:rgba(200,245,66,.52);color:#0e0f11}
+.hm4{background:#c8f542;color:#0e0f11}
+
+/* LEGEND */
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:.75rem}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text3)}
+.legend-sq{width:10px;height:10px;border-radius:2px}
+
+/* TREND TABLE */
+.tt{width:100%;border-collapse:collapse;font-size:12.5px}
+.tt th{padding:6px 8px;color:var(--text3);font-weight:400;text-align:left;border-bottom:1px solid var(--border);font-size:11px}
+.tt td{padding:8px 8px;color:var(--text2);border-bottom:1px solid var(--border)}
+.tt td:last-child{text-align:right;font-family:var(--mono);font-size:12px}
+.tt tr:hover td{background:var(--bg3)}
+
+/* WEATHER */
+.weather-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.w-cell{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;text-align:center;transition:all .15s}
+.w-cell:hover{border-color:var(--border2);transform:translateY(-2px)}
+.w-icon{font-size:26px;margin-bottom:6px}
+.w-name{font-size:11px;color:var(--text3);margin-bottom:3px}
+.w-val{font-size:18px;font-weight:600;font-family:var(--mono)}
+
+/* ACTION */
+.action-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}
+.action-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem;position:relative;overflow:hidden;transition:all .2s}
+.action-card:hover{border-color:var(--border2);transform:translateY(-2px)}
+.action-num{font-size:56px;font-weight:700;font-family:var(--mono);color:rgba(255,255,255,.04);position:absolute;top:.5rem;right:.75rem;line-height:1;pointer-events:none}
+.action-tag{font-size:10px;font-weight:600;letter-spacing:.06em;margin-bottom:.5rem;font-family:var(--mono)}
+.action-title{font-size:14px;font-weight:600;margin-bottom:.5rem}
+.action-desc{font-size:12px;color:var(--text2);line-height:1.6}
+
+/* DATA MANAGER */
+.dm-layout{display:grid;grid-template-columns:300px 1fr;gap:1.25rem;align-items:start}
+.drop-zone{border:1.5px dashed var(--border2);border-radius:var(--radius);padding:1.75rem 1.25rem;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg2)}
+.drop-zone:hover,.drop-zone.dragover{border-color:var(--accent);background:rgba(200,245,66,.03)}
+.dz-icon{font-size:28px;margin-bottom:.625rem}
+.dz-title{font-size:13px;font-weight:500;margin-bottom:4px}
+.dz-sub{font-size:11px;color:var(--text3);line-height:1.5}
+.rules-box{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:1.125rem;margin-top:1rem}
+.rule-row{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border)}
+.rule-row:last-child{border-bottom:none}
+.rule-icon{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0}
+.rule-pass{background:rgba(78,203,113,.18);color:var(--green)}
+.rule-fail{background:rgba(255,94,94,.18);color:var(--red)}
+.rule-warn{background:rgba(245,166,35,.18);color:var(--amber)}
+.rule-pending{background:var(--bg4);color:var(--text3)}
+.rule-text{font-size:12px;color:var(--text2);flex:1}
+.rule-detail{font-size:10.5px;color:var(--text3);font-family:var(--mono)}
+.history-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.history-head{display:grid;grid-template-columns:1fr 90px 80px 70px 60px;padding:8px 14px;border-bottom:1px solid var(--border);font-size:10.5px;color:var(--text3);font-weight:500;letter-spacing:.04em}
+.history-row{display:grid;grid-template-columns:1fr 90px 80px 70px 60px;padding:10px 14px;border-bottom:1px solid var(--border);font-size:12.5px;align-items:center;transition:background .12s;cursor:pointer}
+.history-row:last-child{border-bottom:none}
+.history-row:hover{background:var(--bg3)}
+.history-row.sample-row{opacity:.5}
+.history-row.deleted-row{opacity:.3;text-decoration:line-through}
+.h-name{font-size:12.5px;color:var(--text);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.h-sub{font-size:10.5px;color:var(--text3);margin-top:1px;font-family:var(--mono)}
+.h-date{font-size:11px;color:var(--text3);font-family:var(--mono)}
+.h-rows{font-size:12px;color:var(--text2);text-align:right;font-family:var(--mono)}
+.h-actions{display:flex;gap:6px;justify-content:flex-end}
+.h-btn{width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;transition:all .12s;color:var(--text2)}
+.h-btn:hover{border-color:var(--border3);background:var(--bg4)}
+.h-btn.danger:hover{border-color:rgba(255,94,94,.4);color:var(--red);background:rgba(255,94,94,.08)}
+.h-btn.restore:hover{border-color:rgba(78,203,113,.4);color:var(--green);background:rgba(78,203,113,.08)}
+
+/* MODAL */
+.modal-bg{position:fixed;inset:0;z-index:500;background:rgba(14,15,17,.88);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center}
+.modal-bg.show{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);width:560px;max-width:92vw;max-height:82vh;overflow-y:auto}
+.modal-head{padding:1.125rem 1.375rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--bg2);z-index:1}
+.modal-title{font-size:14px;font-weight:600}
+.modal-body{padding:1.25rem 1.375rem}
+.m-close{width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:transparent;cursor:pointer;font-size:16px;color:var(--text2);display:flex;align-items:center;justify-content:center;transition:all .12s}
+.m-close:hover{background:var(--bg3)}
+.v-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:1.25rem}
+.v-stat{background:var(--bg3);border-radius:var(--radius-sm);padding:.75rem;text-align:center}
+.v-stat-val{font-size:20px;font-weight:600;font-family:var(--mono)}
+.v-stat-lbl{font-size:10.5px;color:var(--text3);margin-top:2px}
+.col-rows{display:flex;flex-direction:column;gap:6px;margin-bottom:1.25rem}
+.col-row{display:grid;grid-template-columns:140px 80px 1fr 70px;gap:8px;align-items:center;padding:7px 10px;background:var(--bg3);border-radius:var(--radius-sm);font-size:12px}
+.col-name{color:var(--text);font-family:var(--mono);font-size:11.5px}
+.col-type{color:var(--text3);font-size:11px}
+.col-sample{color:var(--text2);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sample-alert{background:rgba(245,166,35,.07);border:1px solid rgba(245,166,35,.2);border-radius:var(--radius-sm);padding:.875rem 1rem;margin-bottom:1.25rem}
+.sa-title{font-size:12px;font-weight:500;color:var(--amber);margin-bottom:.375rem}
+.sa-body{font-size:12px;color:var(--text2);line-height:1.55}
+.progress-bar{height:4px;background:var(--bg4);border-radius:2px;overflow:hidden;margin:8px 0}
+.progress-fill{height:100%;border-radius:2px;background:var(--accent);transition:width .4s ease}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;padding-top:1rem;border-top:1px solid var(--border)}
+.m-btn{padding:8px 18px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;cursor:pointer;font-family:var(--font);border:1px solid var(--border2);background:transparent;color:var(--text2);transition:all .15s}
+.m-btn:hover{background:var(--bg3);color:var(--text)}
+.m-btn.confirm{background:var(--accent);color:#0e0f11;border-color:transparent}
+.m-btn.confirm:hover{background:var(--accent2)}
+.m-btn.dng{border-color:rgba(255,94,94,.3);color:var(--red)}
+.m-btn.dng:hover{background:rgba(255,94,94,.1)}
+
+/* TOAST */
+.toast{position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);padding:.875rem 1.125rem;font-size:13px;display:flex;align-items:center;gap:10px;transform:translateY(120%);opacity:0;transition:all .25s ease;max-width:320px;box-shadow:0 8px 32px rgba(0,0,0,.4)}
+.toast.show{transform:translateY(0);opacity:1}
+
+/* INFO BOX */
+.info-box{background:rgba(200,245,66,.04);border:1px solid rgba(200,245,66,.14);border-radius:var(--radius);padding:.875rem 1.125rem;font-size:12px;color:var(--text2);line-height:1.65}
+.info-box strong{color:var(--accent)}
+
+/* CHART PLACEHOLDER */
+.chart-placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--bg3);border:1px dashed var(--border2);border-radius:var(--radius);color:var(--text3);font-size:12px;gap:8px}
+.chart-placeholder-icon{font-size:24px;opacity:.4}
+
+/* RESPONSIVE */
+@media(max-width:1024px){.dm-layout{grid-template-columns:1fr}}
+@media(max-width:860px){
+  .metric-row{grid-template-columns:repeat(2,1fr)}
+  .two-col{grid-template-columns:1fr}
+  .action-grid{grid-template-columns:1fr}
+  .weather-grid{grid-template-columns:repeat(2,1fr)}
+  .col-guide{grid-template-columns:repeat(2,1fr)}
+  .page{padding:1rem}
+  .header,.nav-wrap{padding-left:1rem;padding-right:1rem}
+  .history-head,.history-row{grid-template-columns:1fr 80px 60px 50px}
+  .history-head>:nth-child(3),.history-row>:nth-child(3){display:none}
+  .v-summary{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:560px){
+  .metric-row{grid-template-columns:1fr 1fr;gap:8px}
+  .m-val{font-size:18px}
+  .nav-tab{padding:11px 12px;font-size:12px}
+  .col-guide{grid-template-columns:1fr 1fr}
+}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--border2)}
+</style>
+</head>
+<body>
+
+<!-- TOAST -->
+<div class="toast" id="toast"><span id="toastIcon"></span><span id="toastMsg"></span></div>
+
+<!-- VALIDATION MODAL -->
+<div class="modal-bg" id="vModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title" id="vModalTitle">데이터 검증 결과</div>
+      <button class="m-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="vModalBody"></div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="logo"><div class="logo-dot"></div>매장 매출 분석</div>
+  <div class="hdr-right">
+    <div class="data-chip" id="dataChip" style="display:none">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="dataChipLabel">—</span>
+    </div>
+    <button class="hdr-btn" onclick="switchTab('manager')" id="managerBtn">
+      <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1" y="1" width="4.5" height="4.5" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="7.5" y="1" width="4.5" height="4.5" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="1" y="7.5" width="4.5" height="4.5" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="7.5" y="7.5" width="4.5" height="4.5" rx="1" stroke="currentColor" stroke-width="1.2"/></svg>
+      데이터 관리
+    </button>
+    <button class="hdr-btn primary" id="hdrUploadBtn">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v7M3 4l3-3 3 3M1 9v1.5A.5.5 0 001.5 11h9a.5.5 0 00.5-.5V9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      업로드
+    </button>
+    <input type="file" accept=".csv" style="display:none" id="fileHdr">
+  </div>
+</header>
+
+<!-- NAV -->
+<div class="nav-wrap" id="navWrap" style="display:none">
+  <div class="nav">
+    <button class="nav-tab active" onclick="switchTab('overview')">전체 개요</button>
+    <button class="nav-tab" onclick="switchTab('bcg')">BCG 메뉴 믹스</button>
+    <button class="nav-tab" onclick="switchTab('time')">시간대 · 요일</button>
+    <button class="nav-tab" onclick="switchTab('weather')">날씨 상관관계</button>
+    <button class="nav-tab" onclick="switchTab('trend')">트렌드 변화</button>
+    <button class="nav-tab" onclick="switchTab('action')">액션 플랜</button>
+    <button class="nav-tab" onclick="switchTab('manager')">📂 데이터 관리</button>
+  </div>
+</div>
+
+<!-- ══════════ ONBOARDING (업로드 전) ══════════ -->
+<div id="onboarding">
+  <div class="empty-page">
+    <div class="empty-icon-wrap">📊</div>
+    <div class="empty-title">매출 데이터를 업로드해주세요</div>
+    <div class="empty-sub">CSV 파일을 올리면 BCG 메뉴 믹스, 시간대 분석, 날씨 상관관계 등<br>모든 인사이트가 자동으로 생성됩니다.</div>
+
+    <button class="upload-main-btn" id="onboardUploadBtn">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2v9M4 6l4-4 4 4M2 12v1.5A.5.5 0 002.5 14h11a.5.5 0 00.5-.5V12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      CSV 파일 업로드
+    </button>
+    <input type="file" accept=".csv" style="display:none" id="fileOnboard">
+    <div class="upload-hint">드래그 앤 드롭도 가능 · UTF-8 CSV · 최대 10MB</div>
+
+    <div class="req-label">권장 컬럼 형식</div>
+    <div class="col-guide">
+      <div class="col-chip"><div class="col-chip-name">날짜</div><div class="col-chip-ex">2024-03-01</div></div>
+      <div class="col-chip"><div class="col-chip-name">시간</div><div class="col-chip-ex">19:30</div></div>
+      <div class="col-chip"><div class="col-chip-name">메뉴명</div><div class="col-chip-ex">삼겹살</div></div>
+      <div class="col-chip"><div class="col-chip-name">카테고리</div><div class="col-chip-ex">음식 / 주류</div></div>
+      <div class="col-chip"><div class="col-chip-name">수량</div><div class="col-chip-ex">2</div></div>
+      <div class="col-chip"><div class="col-chip-name">날씨</div><div class="col-chip-ex">맑음 / 비</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ DASHBOARD (업로드 후) ══════════ -->
+<div id="dashboard" style="display:none">
+<div class="page">
+
+<!-- OVERVIEW -->
+<div id="tab-overview" class="panel active">
+  <div class="metric-row">
+    <div class="metric"><div class="m-lbl">총매출 (분석 기간)</div><div class="m-val" id="m-total">—</div><div class="m-sub neutral" id="m-total-sub"></div></div>
+    <div class="metric"><div class="m-lbl">총 판매 건수</div><div class="m-val" id="m-orders">—</div><div class="m-sub neutral" id="m-orders-sub"></div></div>
+    <div class="metric"><div class="m-lbl">최다 판매 메뉴</div><div class="m-val" id="m-top">—</div><div class="m-sub neutral" id="m-top-sub"></div></div>
+    <div class="metric"><div class="m-lbl">분석 기간</div><div class="m-val" id="m-period">—</div><div class="m-sub neutral" id="m-period-sub"></div></div>
+  </div>
+  <div style="margin-bottom:1.25rem">
+    <div class="sec-lbl">카테고리별 판매 추이</div>
+    <div class="box" style="padding:1.25rem 1.25rem .75rem">
+      <div class="legend" id="weekLegend"></div>
+      <div class="chart-wrap" style="height:210px"><canvas id="weekChart"></canvas></div>
+    </div>
+  </div>
+  <div class="two-col">
+    <div class="box">
+      <div class="box-title">카테고리별 판매 구성</div>
+      <div class="legend" id="catLegend"></div>
+      <div class="chart-wrap" style="height:180px"><canvas id="catChart"></canvas></div>
+    </div>
+    <div class="box">
+      <div class="box-title">메뉴별 판매 TOP 10</div>
+      <div class="chart-wrap" style="height:180px"><canvas id="topMenuChart"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- BCG -->
+<div id="tab-bcg" class="panel">
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem">
+    <span class="badge b-g">★ 스타 — 고판매·고수익</span>
+    <span class="badge b-a">⟳ 워킹호스 — 고판매·저수익</span>
+    <span class="badge b-b">? 퍼즐 — 저판매·고수익</span>
+    <span class="badge b-r">✕ 개 — 저판매·저수익</span>
+  </div>
+  <div class="box" style="padding:1.25rem 1.25rem .75rem;margin-bottom:1.25rem">
+    <div class="chart-wrap" style="height:400px"><canvas id="bcgChart"></canvas></div>
+  </div>
+  <div class="info-box">
+    <strong>BCG 매트릭스 읽는 법</strong> — X축은 상대 판매량, Y축은 카테고리 내 상대 수익률(판매량 기준 추정). 수량 데이터만으로 계산되므로 실제 원가 데이터와 함께 보면 더 정확합니다.
+  </div>
+</div>
+
+<!-- TIME -->
+<div id="tab-time" class="panel">
+  <div class="box" style="margin-bottom:1.25rem">
+    <div class="box-title">요일 × 시간대 판매 히트맵</div>
+    <div class="hm-wrap"><table class="hm" id="heatmapTable"></table></div>
+    <div class="legend" style="margin-top:.75rem;margin-bottom:0">
+      <div class="legend-item"><div class="legend-sq hm0"></div>낮음</div>
+      <div class="legend-item"><div class="legend-sq hm1"></div></div>
+      <div class="legend-item"><div class="legend-sq hm2"></div></div>
+      <div class="legend-item"><div class="legend-sq hm3"></div></div>
+      <div class="legend-item"><div class="legend-sq" style="background:#c8f542"></div>최고</div>
+    </div>
+  </div>
+  <div class="two-col">
+    <div class="box">
+      <div class="box-title">시간대별 카테고리 비율</div>
+      <div class="chart-wrap" style="height:210px"><canvas id="timeChart"></canvas></div>
+    </div>
+    <div class="box">
+      <div class="box-title">요일별 총 판매량</div>
+      <div class="chart-wrap" style="height:210px"><canvas id="dowChart"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- WEATHER -->
+<div id="tab-weather" class="panel">
+  <div style="margin-bottom:1.25rem">
+    <div class="sec-lbl">날씨 조건별 평균 판매량</div>
+    <div class="weather-grid" id="weatherGrid"></div>
+  </div>
+  <div class="box">
+    <div class="box-title">날씨별 메뉴 판매 비교</div>
+    <div class="chart-wrap" style="height:260px"><canvas id="weatherChart"></canvas></div>
+  </div>
+</div>
+
+<!-- TREND -->
+<div id="tab-trend" class="panel">
+  <div class="two-col" style="margin-bottom:1.25rem">
+    <div class="box">
+      <div class="box-title">급상승 메뉴 <span class="badge b-g" id="trendPeriodLabel"></span></div>
+      <table class="tt" id="risingTable">
+        <tr><th>메뉴</th><th>초반</th><th>최근</th><th>변화</th></tr>
+      </table>
+    </div>
+    <div class="box">
+      <div class="box-title">급감 위험 메뉴 <span class="badge b-r">주의</span></div>
+      <table class="tt" id="fallingTable">
+        <tr><th>메뉴</th><th>초반</th><th>최근</th><th>변화</th></tr>
+      </table>
+    </div>
+  </div>
+  <div class="box">
+    <div class="box-title">상위 메뉴 기간별 추이</div>
+    <div class="legend" id="trendLegend"></div>
+    <div class="chart-wrap" style="height:230px"><canvas id="trendChart"></canvas></div>
+  </div>
+</div>
+
+<!-- ACTION -->
+<div id="tab-action" class="panel">
+  <div style="margin-bottom:1.25rem">
+    <div class="sec-lbl">데이터 기반 즉시 조치 항목</div>
+    <div class="action-grid" id="actionGrid"></div>
+  </div>
+  <div class="two-col">
+    <div class="box">
+      <div class="box-title">재고 관리 포인트</div>
+      <ul class="ilist" id="inventoryList"></ul>
+    </div>
+    <div class="box">
+      <div class="box-title">운영 개선 제안</div>
+      <ul class="ilist" id="opsList"></ul>
+    </div>
+  </div>
+</div>
+
+<!-- MANAGER -->
+<div id="tab-manager" class="panel">
+  <div class="dm-layout">
+    <div>
+      <div class="drop-zone" id="dmDrop">
+        <div class="dz-icon">📂</div>
+        <div class="dz-title">새 CSV 업로드</div>
+        <div class="dz-sub">드래그하거나 클릭해서 선택<br>UTF-8 인코딩 CSV · 최대 10MB</div>
+        <input type="file" accept=".csv" style="display:none" id="fileDm">
+      </div>
+      <div class="rules-box">
+        <div style="font-size:11px;font-weight:500;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:.625rem">검증 규칙</div>
+        <div class="rule-row"><div class="rule-icon rule-pending" id="ri-cols">?</div><div class="rule-text">필수 컬럼 존재 여부</div><div class="rule-detail" id="rd-cols">—</div></div>
+        <div class="rule-row"><div class="rule-icon rule-pending" id="ri-date">?</div><div class="rule-text">날짜 형식 유효성</div><div class="rule-detail" id="rd-date">—</div></div>
+        <div class="rule-row"><div class="rule-icon rule-pending" id="ri-qty">?</div><div class="rule-text">수량 숫자 형식</div><div class="rule-detail" id="rd-qty">—</div></div>
+        <div class="rule-row"><div class="rule-icon rule-pending" id="ri-dup">?</div><div class="rule-text">중복 행 감지</div><div class="rule-detail" id="rd-dup">—</div></div>
+        <div class="rule-row"><div class="rule-icon rule-pending" id="ri-sample">?</div><div class="rule-text">샘플/테스트 데이터</div><div class="rule-detail" id="rd-sample">—</div></div>
+        <div class="rule-row"><div class="rule-icon rule-pending" id="ri-empty">?</div><div class="rule-text">필수 필드 공백</div><div class="rule-detail" id="rd-empty">—</div></div>
+      </div>
+    </div>
+    <div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.875rem">
+        <div style="font-size:13px;font-weight:500">업로드 이력</div>
+        <div style="display:flex;gap:6px">
+          <button class="hdr-btn active-filter" id="fAll" onclick="setFilter('all')" style="font-size:11px;padding:5px 10px">전체</button>
+          <button class="hdr-btn" id="fOk" onclick="setFilter('ok')" style="font-size:11px;padding:5px 10px">유효</button>
+          <button class="hdr-btn" id="fBad" onclick="setFilter('bad')" style="font-size:11px;padding:5px 10px">문제있음</button>
+        </div>
+      </div>
+      <div class="history-wrap">
+        <div class="history-head">
+          <div>파일명</div><div style="text-align:center">상태</div><div style="text-align:right">행 수</div><div style="text-align:right">업로드일</div><div style="text-align:right">관리</div>
+        </div>
+        <div id="historyList"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:1rem">
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;text-align:center">
+          <div style="font-size:18px;font-weight:600;font-family:var(--mono)" id="sTot">0</div>
+          <div style="font-size:10.5px;color:var(--text3);margin-top:2px">총 업로드</div>
+        </div>
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;text-align:center">
+          <div style="font-size:18px;font-weight:600;font-family:var(--mono);color:var(--green)" id="sOk">0</div>
+          <div style="font-size:10.5px;color:var(--text3);margin-top:2px">유효</div>
+        </div>
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;text-align:center">
+          <div style="font-size:18px;font-weight:600;font-family:var(--mono);color:var(--red)" id="sDel">0</div>
+          <div style="font-size:10.5px;color:var(--text3);margin-top:2px">삭제됨</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /page -->
+</div><!-- /dashboard -->
+
+<script>
+/* ═══════════════════════════════
+   STATE
+═══════════════════════════════ */
+const SAMPLE_KW = ['sample','test','테스트','샘플','demo','데모','dummy','더미','example','예시','임시','temp','tmp'];
+const DATE_ALTS = ['날짜','date','일자','판매일'];
+const TIME_ALTS = ['시간','time','시각','판매시간'];
+const QTY_ALTS  = ['수량','qty','quantity','판매수량','개수','판매량'];
+const MENU_ALTS = ['메뉴명','메뉴','menu','품목'];
+const CAT_ALTS  = ['카테고리','category','분류','구분'];
+const WTHR_ALTS = ['날씨','weather','기상'];
+const DATE_RE   = /^\d{4}[-./]\d{1,2}[-./]\d{1,2}/;
+
+let history = JSON.parse(localStorage.getItem('mdash_history') || '[]');
+let histFilter = 'all';
+let chartRefs = {};
+let DATA = null; // parsed & mapped data
+
+/* ═══════════════════════════════
+   UTILS
+═══════════════════════════════ */
+function findCol(fields, alts) {
+  return fields.find(f => alts.some(a => f.toLowerCase().includes(a.toLowerCase()))) || null;
+}
+function fmt(n) {
+  if(n >= 1000000) return (n/1000000).toFixed(1)+'M';
+  if(n >= 1000) return (n/1000).toFixed(0)+'K';
+  return String(Math.round(n));
+}
+function fmtDate(iso) {
+  const d = new Date(iso);
+  return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+const CAT_COLORS = ['#4a9eff','#4ecb71','#f5a623','#2dd4bf','#ff5e5e','#a78bfa','#f472b6'];
+
+/* ═══════════════════════════════
+   TAB SWITCH
+═══════════════════════════════ */
+function switchTab(name) {
+  const tabs = ['overview','bcg','time','weather','trend','action','manager'];
+  document.querySelectorAll('.nav-tab').forEach((t,i) => t.classList.toggle('active', tabs[i]===name));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id==='tab-'+name));
+}
+
+/* ═══════════════════════════════
+   TOAST
+═══════════════════════════════ */
+let toastTimer;
+function toast(msg, type='success') {
+  const icons = {success:'✅',error:'❌',warn:'⚠️',info:'ℹ️'};
+  document.getElementById('toastIcon').textContent = icons[type]||'ℹ️';
+  document.getElementById('toastMsg').textContent = msg;
+  const el = document.getElementById('toast');
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
+}
+
+/* ═══════════════════════════════
+   MODAL
+═══════════════════════════════ */
+function closeModal() { document.getElementById('vModal').classList.remove('show'); }
+document.getElementById('vModal').addEventListener('click', e => { if(e.target===e.currentTarget) closeModal(); });
+
+/* ═══════════════════════════════
+   UPLOAD WIRING
+═══════════════════════════════ */
+function wireFile(btnId, inputId) {
+  document.getElementById(btnId)?.addEventListener('click', () => document.getElementById(inputId).click());
+  document.getElementById(inputId).addEventListener('change', e => { if(e.target.files[0]) handleFile(e.target.files[0]); });
+}
+wireFile('hdrUploadBtn','fileHdr');
+wireFile('onboardUploadBtn','fileOnboard');
+
+const dmDrop = document.getElementById('dmDrop');
+dmDrop.addEventListener('click', () => document.getElementById('fileDm').click());
+document.getElementById('fileDm').addEventListener('change', e => { if(e.target.files[0]) handleFile(e.target.files[0]); });
+dmDrop.addEventListener('dragover', e => { e.preventDefault(); dmDrop.classList.add('dragover'); });
+dmDrop.addEventListener('dragleave', () => dmDrop.classList.remove('dragover'));
+dmDrop.addEventListener('drop', e => { e.preventDefault(); dmDrop.classList.remove('dragover'); if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+
+// global drag-drop on onboarding
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop', e => {
+  e.preventDefault();
+  const f = e.dataTransfer.files[0];
+  if(f && f.name.endsWith('.csv')) handleFile(f);
+});
+
+/* ═══════════════════════════════
+   HANDLE FILE
+═══════════════════════════════ */
+function handleFile(file) {
+  if(!file.name.endsWith('.csv')) { toast('CSV 파일만 가능합니다.','error'); return; }
+  if(file.size > 10*1024*1024) { toast('10MB 이하 파일만 업로드 가능합니다.','error'); return; }
+  Papa.parse(file, {
+    header: true, skipEmptyLines: true,
+    complete: res => {
+      const v = validate(res.data, res.meta.fields, file.name);
+      addHistory(file, v);
+      updateRuleUI(v);
+      showValidationModal(file.name, v, res.data, res.meta.fields);
+      if(v.valid || (!v.sample.detected && v.cols.pass)) {
+        DATA = buildData(res.data, res.meta.fields);
+        renderDashboard();
+        showDashboard(file.name, v);
+      }
+    },
+    error: () => toast('파일 읽기 실패. 인코딩(UTF-8)을 확인하세요.','error')
+  });
+}
+
+/* ═══════════════════════════════
+   SHOW DASHBOARD
+═══════════════════════════════ */
+function showDashboard(filename, v) {
+  document.getElementById('onboarding').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+  document.getElementById('navWrap').style.display = 'block';
+  document.getElementById('dataChip').style.display = 'flex';
+  document.getElementById('dataChipLabel').textContent = filename.length>22 ? filename.slice(0,20)+'…' : filename;
+  document.getElementById('statusDot').className = 'status-dot' + (v.valid?' ok':'');
+  switchTab('overview');
+}
+
+/* ═══════════════════════════════
+   VALIDATE
+═══════════════════════════════ */
+function validate(rows, fields, filename) {
+  const v = {
+    filename, rowCount: rows.length,
+    cols:{pass:false,found:fields,missing:[]},
+    date:{pass:false,invalidCount:0},
+    qty:{pass:false,invalidCount:0},
+    dup:{pass:false,dupCount:0},
+    sample:{detected:false,reasons:[]},
+    empty:{pass:false,emptyCount:0},
+    valid:false
+  };
+  const dateC = findCol(fields,DATE_ALTS);
+  const qtyC  = findCol(fields,QTY_ALTS);
+  const menuC = findCol(fields,MENU_ALTS);
+  if(!dateC) v.cols.missing.push('날짜');
+  if(!qtyC)  v.cols.missing.push('수량');
+  if(!menuC) v.cols.missing.push('메뉴명');
+  v.cols.pass = v.cols.missing.length===0;
+  if(dateC) { const bad=rows.filter(r=>r[dateC]&&!DATE_RE.test(r[dateC])); v.date.invalidCount=bad.length; v.date.pass=bad.length===0; } else v.date.pass=false;
+  if(qtyC)  { const bad=rows.filter(r=>r[qtyC]!==undefined&&isNaN(parseFloat(r[qtyC]))); v.qty.invalidCount=bad.length; v.qty.pass=bad.length===0; } else v.qty.pass=false;
+  const seen=new Set(); let dups=0;
+  rows.forEach(r=>{const k=JSON.stringify(r);if(seen.has(k))dups++;else seen.add(k)});
+  v.dup.dupCount=dups; v.dup.pass=dups===0;
+  if(SAMPLE_KW.some(k=>filename.toLowerCase().includes(k))){v.sample.detected=true;v.sample.reasons.push('파일명에 샘플/테스트 키워드 포함')}
+  if(menuC){const sr=rows.filter(r=>SAMPLE_KW.some(k=>(r[menuC]||'').toLowerCase().includes(k)));if(sr.length){v.sample.detected=true;v.sample.reasons.push(`메뉴명에 테스트 키워드 포함 (${sr.length}행)`)}}
+  if(rows.length<=5&&rows.length>0){v.sample.detected=true;v.sample.reasons.push(`행 수가 너무 적음 (${rows.length}행)`)}
+  const chk=[dateC,qtyC,menuC].filter(Boolean); let emp=0;
+  rows.forEach(r=>chk.forEach(c=>{if(!r[c]||String(r[c]).trim()==='')emp++}));
+  v.empty.emptyCount=emp; v.empty.pass=emp===0;
+  v.valid = v.cols.pass&&v.date.pass&&v.qty.pass&&v.dup.pass&&!v.sample.detected&&v.empty.pass;
+  return v;
+}
+
+/* ═══════════════════════════════
+   RULE UI
+═══════════════════════════════ */
+function updateRuleUI(v) {
+  function set(id,pass,warn,detail){
+    const ic=document.getElementById('ri-'+id),det=document.getElementById('rd-'+id);
+    ic.className='rule-icon '+(pass?'rule-pass':warn?'rule-warn':'rule-fail');
+    ic.textContent=pass?'✓':warn?'!':'✗'; det.textContent=detail;
+  }
+  set('cols',v.cols.pass,false,v.cols.pass?`${v.cols.found.length}개`:`누락: ${v.cols.missing.join(', ')}`);
+  set('date',v.date.pass,false,v.date.pass?'정상':`${v.date.invalidCount}행 오류`);
+  set('qty',v.qty.pass,false,v.qty.pass?'정상':`${v.qty.invalidCount}행 오류`);
+  set('dup',v.dup.pass,v.dup.dupCount>0,v.dup.pass?'없음':`${v.dup.dupCount}행`);
+  set('sample',!v.sample.detected,false,v.sample.detected?v.sample.reasons[0]:'미감지');
+  set('empty',v.empty.pass,false,v.empty.pass?'없음':`${v.empty.emptyCount}개`);
+}
+
+/* ═══════════════════════════════
+   VALIDATION MODAL
+═══════════════════════════════ */
+function showValidationModal(filename, v, rows, fields) {
+  document.getElementById('vModalTitle').textContent = `검증 결과 — ${filename}`;
+  const pass=[v.cols.pass,v.date.pass,v.qty.pass,v.dup.pass,!v.sample.detected,v.empty.pass].filter(Boolean).length;
+  const sc=pass>=5?'var(--green)':pass>=3?'var(--amber)':'var(--red)';
+  const pct=Math.round(pass/6*100);
+  let html=`<div class="v-summary">
+    <div class="v-stat"><div class="v-stat-val">${v.rowCount.toLocaleString()}</div><div class="v-stat-lbl">전체 행</div></div>
+    <div class="v-stat"><div class="v-stat-val" style="color:${sc}">${pass}/6</div><div class="v-stat-lbl">검증 통과</div></div>
+    <div class="v-stat"><div class="v-stat-val" style="color:var(--red)">${v.dup.dupCount}</div><div class="v-stat-lbl">중복 행</div></div>
+    <div class="v-stat"><div class="v-stat-val" style="color:var(--amber)">${v.empty.emptyCount}</div><div class="v-stat-lbl">빈 값</div></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:1.25rem">
+    <div class="progress-bar" style="flex:1"><div class="progress-fill" style="width:${pct}%"></div></div>
+    <div style="font-size:12px;font-family:var(--mono);color:var(--text2);flex-shrink:0">${pct}% 통과</div>
+  </div>`;
+  html+=`<div style="font-size:11px;color:var(--text3);font-weight:500;letter-spacing:.06em;text-transform:uppercase;margin-bottom:.5rem">감지된 컬럼 (${fields.length}개)</div><div class="col-rows">`;
+  fields.slice(0,8).forEach(col=>{
+    const isR=[...DATE_ALTS,...QTY_ALTS,...MENU_ALTS].some(a=>col.toLowerCase().includes(a.toLowerCase()));
+    const sv=rows.slice(0,2).map(r=>r[col]).filter(Boolean).join(' / ');
+    html+=`<div class="col-row"><div class="col-name">${col}</div><div class="col-type">${isR?'<span style="color:var(--green)">필수</span>':'선택'}</div><div class="col-sample">${sv||'—'}</div><div style="text-align:right"><span class="badge ${isR?'b-g':'b-n'}">${isR?'매핑됨':'참고'}</span></div></div>`;
+  });
+  html+='</div>';
+  if(v.sample.detected){html+=`<div class="sample-alert"><div class="sa-title">⚠️ 샘플/테스트 데이터 감지</div><div class="sa-body">${v.sample.reasons.join('<br>')}</div></div>`;}
+  const issues=[];
+  if(!v.cols.pass) issues.push(`필수 컬럼 누락: <strong>${v.cols.missing.join(', ')}</strong>`);
+  if(!v.date.pass) issues.push(`날짜 형식 오류 ${v.date.invalidCount}행 — 권장: YYYY-MM-DD`);
+  if(!v.qty.pass)  issues.push(`수량 형식 오류 ${v.qty.invalidCount}행 — 숫자만 입력`);
+  if(!v.dup.pass)  issues.push(`중복 행 ${v.dup.dupCount}개 감지`);
+  if(!v.empty.pass) issues.push(`필수 필드 빈 값 ${v.empty.emptyCount}개`);
+  if(issues.length) html+=`<div style="font-size:11px;color:var(--text3);font-weight:500;letter-spacing:.06em;text-transform:uppercase;margin-bottom:.5rem">발견된 문제</div><ul style="list-style:none;display:flex;flex-direction:column;gap:6px;margin-bottom:1rem">${issues.map(i=>`<li style="font-size:12px;color:var(--text2);padding:7px 10px;background:rgba(255,94,94,.06);border:1px solid rgba(255,94,94,.15);border-radius:6px">${i}</li>`).join('')}</ul>`;
+  html+=`<div class="modal-actions">`;
+  if(v.sample.detected) html+=`<button class="m-btn dng" onclick="flagCurrentAsSample();closeModal()">샘플로 표시 후 제외</button>`;
+  html+=`<button class="m-btn" onclick="closeModal()">닫기</button>`;
+  if(v.cols.pass) html+=`<button class="m-btn confirm" onclick="closeModal();switchTab('overview')">분석 보기 →</button>`;
+  html+='</div>';
+  document.getElementById('vModalBody').innerHTML=html;
+  document.getElementById('vModal').classList.add('show');
+}
+
+/* ═══════════════════════════════
+   BUILD DATA
+═══════════════════════════════ */
+function buildData(rows, fields) {
+  const dateC = findCol(fields,DATE_ALTS);
+  const timeC = findCol(fields,TIME_ALTS);
+  const qtyC  = findCol(fields,QTY_ALTS);
+  const menuC = findCol(fields,MENU_ALTS);
+  const catC  = findCol(fields,CAT_ALTS);
+  const wthrC = findCol(fields,WTHR_ALTS);
+  return rows.map(r=>({
+    date:  r[dateC]||'',
+    time:  timeC ? r[timeC]||'' : '',
+    qty:   parseFloat(r[qtyC])||1,
+    menu:  menuC ? r[menuC]||'기타' : '기타',
+    cat:   catC  ? r[catC]||'기타'  : '기타',
+    weather: wthrC ? r[wthrC]||''  : '',
+    hour:  timeC ? parseInt((r[timeC]||'0').split(':')[0])||0 : -1,
+    dow:   dateC ? new Date(r[dateC]).getDay() : -1,
+    week:  dateC ? getWeekNum(r[dateC]) : -1,
+  })).filter(r=>r.date);
+}
+function getWeekNum(dateStr) {
+  const d=new Date(dateStr);
+  const jan1=new Date(d.getFullYear(),0,1);
+  return Math.ceil(((d-jan1)/86400000+jan1.getDay()+1)/7);
+}
+
+/* ═══════════════════════════════
+   RENDER DASHBOARD
+═══════════════════════════════ */
+function destroyChart(id){if(chartRefs[id]){chartRefs[id].destroy();delete chartRefs[id]}}
+const CDEF={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#4e4e4a',font:{size:10}}},y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#4e4e4a',font:{size:10}}}}};
+
+function renderDashboard() {
+  const D = DATA;
+  const cats = [...new Set(D.map(r=>r.cat))].filter(Boolean);
+  const menus = [...new Set(D.map(r=>r.menu))].filter(Boolean);
+
+  // ── OVERVIEW metrics ──
+  const total = D.reduce((s,r)=>s+r.qty,0);
+  const menuQty = {};
+  D.forEach(r=>menuQty[r.menu]=(menuQty[r.menu]||0)+r.qty);
+  const topMenu = Object.entries(menuQty).sort((a,b)=>b[1]-a[1])[0]||['—',0];
+  const dates = D.map(r=>r.date).filter(Boolean).sort();
+  document.getElementById('m-total').textContent = fmt(total)+'개';
+  document.getElementById('m-total-sub').textContent = '총 판매 수량';
+  document.getElementById('m-orders').textContent = D.length.toLocaleString();
+  document.getElementById('m-orders-sub').textContent = '건';
+  document.getElementById('m-top').textContent = topMenu[0];
+  document.getElementById('m-top-sub').textContent = `${Math.round(topMenu[1])}개 판매`;
+  document.getElementById('m-period').textContent = dates.length ? dates[0].slice(5).replace('-','/') : '—';
+  document.getElementById('m-period-sub').textContent = dates.length>1 ? `~ ${dates[dates.length-1].slice(5).replace('-','/')}` : '';
+
+  // ── WEEK CHART (by week × category) ──
+  destroyChart('weekChart');
+  const weeks=[...new Set(D.map(r=>r.week))].filter(w=>w>0).sort();
+  const catQtyByWeek={};
+  cats.forEach(c=>{catQtyByWeek[c]=weeks.map(w=>D.filter(r=>r.week===w&&r.cat===c).reduce((s,r)=>s+r.qty,0))});
+  const wl=document.getElementById('weekLegend'); wl.innerHTML='';
+  cats.forEach((c,i)=>{wl.innerHTML+=`<div class="legend-item"><div class="legend-sq" style="background:${CAT_COLORS[i%CAT_COLORS.length]}"></div>${c}</div>`});
+  chartRefs['weekChart']=new Chart(document.getElementById('weekChart'),{type:'bar',
+    data:{labels:weeks.map(w=>`${w}주`),datasets:cats.map((c,i)=>({label:c,data:catQtyByWeek[c],backgroundColor:CAT_COLORS[i%CAT_COLORS.length],borderRadius:4,stack:'s'}))},
+    options:{...CDEF,scales:{x:{stacked:true,grid:{display:false},ticks:{color:'#4e4e4a',font:{size:11}}},y:{stacked:true,grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#4e4e4a',font:{size:10}}}}}});
+
+  // ── CAT PIE ──
+  destroyChart('catChart');
+  const catTotals=cats.map(c=>D.filter(r=>r.cat===c).reduce((s,r)=>s+r.qty,0));
+  const catLeg=document.getElementById('catLegend'); catLeg.innerHTML='';
+  cats.forEach((c,i)=>{const pct=Math.round(catTotals[i]/total*100);catLeg.innerHTML+=`<div class="legend-item"><div class="legend-sq" style="background:${CAT_COLORS[i%CAT_COLORS.length]}"></div>${c} <strong style="color:var(--text)">${pct}%</strong></div>`;});
+  chartRefs['catChart']=new Chart(document.getElementById('catChart'),{type:'doughnut',
+    data:{labels:cats,datasets:[{data:catTotals,backgroundColor:cats.map((_,i)=>CAT_COLORS[i%CAT_COLORS.length]),borderWidth:0,hoverOffset:8}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'70%',plugins:{legend:{display:false}}}});
+
+  // ── TOP MENU BAR ──
+  destroyChart('topMenuChart');
+  const top10=Object.entries(menuQty).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  chartRefs['topMenuChart']=new Chart(document.getElementById('topMenuChart'),{type:'bar',
+    data:{labels:top10.map(x=>x[0]),datasets:[{data:top10.map(x=>x[1]),backgroundColor:'#4a9eff',borderRadius:4}]},
+    options:{...CDEF,indexAxis:'y',scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#4e4e4a',font:{size:10}}},y:{grid:{display:false},ticks:{color:'#9a9a96',font:{size:10}}}}}});
+
+  // ── BCG ──
+  destroyChart('bcgChart');
+  const avgQty=total/menus.length||1;
+  const catAvg={};
+  cats.forEach(c=>{const cm=menus.filter(m=>D.some(r=>r.menu===m&&r.cat===c));const ca=cm.reduce((s,m)=>s+menuQty[m],0)/(cm.length||1);catAvg[c]=ca;});
+  const bcgData=['스타','워킹호스','퍼즐','개'].map(q=>({label:q,data:[]}));
+  const qC={'스타':'#4ecb71','워킹호스':'#f5a623','퍼즐':'#4a9eff','개':'#ff5e5e'};
+  menus.slice(0,20).forEach(m=>{
+    const q=menuQty[m]; const mc=D.find(r=>r.menu===m)?.cat||'기타';
+    const relQ=Math.min(99,Math.round(q/avgQty*50));
+    const relY=Math.min(88,Math.max(12,Math.round(q/catAvg[mc]*50)));
+    const r=Math.max(5,Math.min(16,Math.round(q/avgQty*8)));
+    const quad=relQ>=50&&relY>=50?'스타':relQ>=50?'워킹호스':relY>=50?'퍼즐':'개';
+    bcgData.find(d=>d.label===quad).data.push({x:relQ,y:relY,r,label:m});
+  });
+  chartRefs['bcgChart']=new Chart(document.getElementById('bcgChart'),{type:'bubble',
+    data:{datasets:bcgData.map(d=>({label:d.label,data:d.data,backgroundColor:qC[d.label]+'55',borderColor:qC[d.label],borderWidth:1.5}))},
+    options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:24,right:24,bottom:8,left:8}},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.raw.label}`}}},
+      scales:{x:{title:{display:true,text:'상대 판매량 →',font:{size:11},color:'#4e4e4a'},min:0,max:110,grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#4e4e4a',font:{size:10}}},
+              y:{title:{display:true,text:'↑ 카테고리 내 상대 수익률',font:{size:11},color:'#4e4e4a'},min:0,max:100,grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#4e4e4a',font:{size:10},callback:v=>v+'%'}}}},
+    plugins:[{afterDraw(chart){
+      const{ctx,chartArea:{left,right,top,bottom}}=chart;
+      const mx=(left+right)/2,my=(top+bottom)/2;
+      ctx.save();ctx.strokeStyle='rgba(255,255,255,.08)';ctx.lineWidth=1;ctx.setLineDash([5,5]);
+      ctx.beginPath();ctx.moveTo(mx,top);ctx.lineTo(mx,bottom);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(left,my);ctx.lineTo(right,my);ctx.stroke();ctx.setLineDash([]);
+      [['★ 스타',left+10,top+18,'#4ecb71'],['? 퍼즐',left+10,bottom-8,'#4a9eff'],['⟳ 워킹호스',mx+8,top+18,'#f5a623'],['✕ 개',mx+8,bottom-8,'#ff5e5e']]
+        .forEach(([t,x,y,c])=>{ctx.font='500 11px "Noto Sans KR"';ctx.fillStyle=c+'aa';ctx.fillText(t,x,y)});
+      chart.data.datasets.forEach(ds=>ds.data.forEach(pt=>{if(!pt.label)return;
+        ctx.font='12px "Noto Sans KR"';ctx.fillStyle='rgba(240,240,238,.75)';
+        ctx.fillText(pt.label,chart.scales.x.getPixelForValue(pt.x)+pt.r+4,chart.scales.y.getPixelForValue(pt.y)+4)}));
+      ctx.restore();
+    }}]});
+
+  // ── HEATMAP ──
+  const hmTable=document.getElementById('heatmapTable');
+  hmTable.innerHTML='';
+  const timeSlots=['11-13시','13-15시','15-17시','17-19시','19-21시','21-23시'];
+  const hmRanges=[[11,13],[13,15],[15,17],[17,19],[19,21],[21,23]];
+  const dowNames=['일','월','화','수','목','금','토'];
+  const hmVals=hmRanges.map(([s,e])=>Array(7).fill(0).map((_,d)=>D.filter(r=>r.hour>=s&&r.hour<e&&r.dow===d).reduce((sum,r)=>sum+r.qty,0)));
+  const hmMax=Math.max(...hmVals.flat())||1;
+  const hdr=document.createElement('tr');
+  hdr.innerHTML='<th></th>'+dowNames.map(d=>`<th>${d}</th>`).join('');
+  hmTable.appendChild(hdr);
+  hmVals.forEach((row,ri)=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<th style="text-align:left;color:var(--text3);font-weight:400;white-space:nowrap;padding:6px 8px 6px 0">${timeSlots[ri]}</th>`;
+    row.forEach(v=>{
+      const lv=v===0?0:v<hmMax*.25?1:v<hmMax*.5?2:v<hmMax*.75?3:4;
+      const labels=['—','낮음','보통','높음','최고'];
+      tr.innerHTML+=`<td class="hm${lv}">${labels[lv]}</td>`;
+    });
+    hmTable.appendChild(tr);
+  });
+
+  // ── TIME RATIO ──
+  destroyChart('timeChart');
+  const timeLabels=timeSlots;
+  const catTimeData=cats.map((c,i)=>({label:c,data:hmRanges.map(([s,e])=>D.filter(r=>r.hour>=s&&r.hour<e&&r.cat===c).reduce((sum,r)=>sum+r.qty,0)),backgroundColor:CAT_COLORS[i%CAT_COLORS.length],stack:'s'}));
+  chartRefs['timeChart']=new Chart(document.getElementById('timeChart'),{type:'bar',
+    data:{labels:timeLabels,datasets:catTimeData},
+    options:{...CDEF,scales:{x:{stacked:true,grid:{display:false},ticks:{color:'#4e4e4a',font:{size:10}}},y:{stacked:true,grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#4e4e4a',font:{size:10}}}}}});
+
+  // ── DOW CHART ──
+  destroyChart('dowChart');
+  const dowTotals=dowNames.map((_,d)=>D.filter(r=>r.dow===d).reduce((s,r)=>s+r.qty,0));
+  chartRefs['dowChart']=new Chart(document.getElementById('dowChart'),{type:'bar',
+    data:{labels:dowNames,datasets:[{data:dowTotals,backgroundColor:dowTotals.map(v=>v===Math.max(...dowTotals)?'#c8f542':'#25282d'),borderRadius:4}]},
+    options:{...CDEF,scales:{x:{grid:{display:false},ticks:{color:'#9a9a96',font:{size:11}}},y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#4e4e4a',font:{size:10}}}}}});
+
+  // ── WEATHER ──
+  const wthrTypes=[...new Set(D.map(r=>r.weather))].filter(Boolean);
+  const wGrid=document.getElementById('weatherGrid'); wGrid.innerHTML='';
+  const wIcons={'맑음':'☀️','흐림':'🌤️','비':'🌧','눈':'🌨','폭우':'⛈','바람':'💨','황사':'💨'};
+  const baseAvg=total/D.length||1;
+  if(wthrTypes.length===0){wGrid.innerHTML=`<div style="grid-column:1/-1;text-align:center;color:var(--text3);font-size:13px;padding:2rem">날씨 컬럼이 없거나 데이터가 비어 있습니다.</div>`;}
+  else{wthrTypes.forEach(w=>{
+    const wRows=D.filter(r=>r.weather===w);
+    const wAvg=wRows.reduce((s,r)=>s+r.qty,0)/(wRows.length||1);
+    const diff=Math.round((wAvg/baseAvg-1)*100);
+    const icon=Object.entries(wIcons).find(([k])=>w.includes(k))?.[1]||'🌡️';
+    wGrid.innerHTML+=`<div class="w-cell"><div class="w-icon">${icon}</div><div class="w-name">${w}</div><div class="w-val ${diff>=0?'up':'down'}">${diff>=0?'+':''}${diff}%</div><div style="font-size:10px;color:var(--text3);margin-top:2px">${wRows.length}건</div></div>`;
+  });}
+
+  destroyChart('weatherChart');
+  if(wthrTypes.length>0){
+    const wthrMenuTop=Object.entries(menuQty).sort((a,b)=>b[1]-a[1]).slice(0,5).map(x=>x[0]);
+    const wDatasets=wthrTypes.slice(0,5).map((w,i)=>({label:w,data:wthrMenuTop.map(m=>D.filter(r=>r.weather===w&&r.menu===m).reduce((s,r)=>s+r.qty,0)),backgroundColor:CAT_COLORS[i%CAT_COLORS.length],borderRadius:3}));
+    chartRefs['weatherChart']=new Chart(document.getElementById('weatherChart'),{type:'bar',
+      data:{labels:wthrMenuTop,datasets:wDatasets},
+      options:{...CDEF,plugins:{legend:{display:true,labels:{color:'#9a9a96',font:{size:11},boxWidth:12}}},
+        scales:{x:{grid:{display:false},ticks:{color:'#9a9a96',font:{size:10}}},y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#4e4e4a',font:{size:10}}}}}});
+  }
+
+  // ── TREND ──
+  const halfLen=Math.floor(D.length/2);
+  const firstHalf=D.slice(0,halfLen); const secHalf=D.slice(halfLen);
+  const mFirst={},mSec={};
+  firstHalf.forEach(r=>mFirst[r.menu]=(mFirst[r.menu]||0)+r.qty);
+  secHalf.forEach(r=>mSec[r.menu]=(mSec[r.menu]||0)+r.qty);
+  const changes=menus.map(m=>{const f=mFirst[m]||0,s=mSec[m]||0;return{menu:m,first:f,sec:s,pct:f>0?Math.round((s-f)/f*100):s>0?999:0}}).filter(x=>x.first>0||x.sec>0);
+  const rising=changes.filter(x=>x.pct>0).sort((a,b)=>b.pct-a.pct).slice(0,5);
+  const falling=changes.filter(x=>x.pct<0).sort((a,b)=>a.pct-b.pct).slice(0,5);
+  document.getElementById('trendPeriodLabel').textContent='분석 기간';
+  const rt=document.getElementById('risingTable'); rt.innerHTML='<tr><th>메뉴</th><th>초반</th><th>최근</th><th>변화</th></tr>';
+  rising.forEach(x=>{rt.innerHTML+=`<tr><td>${x.menu}</td><td style="color:var(--text3)">${Math.round(x.first)}</td><td>${Math.round(x.sec)}</td><td class="up">+${x.pct}%</td></tr>`;});
+  const ft=document.getElementById('fallingTable'); ft.innerHTML='<tr><th>메뉴</th><th>초반</th><th>최근</th><th>변화</th></tr>';
+  falling.forEach(x=>{ft.innerHTML+=`<tr><td>${x.menu}</td><td style="color:var(--text3)">${Math.round(x.first)}</td><td>${Math.round(x.sec)}</td><td class="down">${x.pct}%</td></tr>`;});
+
+  destroyChart('trendChart');
+  const trendMenus=Object.entries(menuQty).sort((a,b)=>b[1]-a[1]).slice(0,5).map(x=>x[0]);
+  const tColors=['#c8f542','#4a9eff','#f5a623','#4ecb71','#ff5e5e'];
+  const tLeg=document.getElementById('trendLegend'); tLeg.innerHTML='';
+  trendMenus.forEach((m,i)=>{tLeg.innerHTML+=`<div class="legend-item"><div class="legend-sq" style="background:${tColors[i]}"></div>${m}</div>`;});
+  chartRefs['trendChart']=new Chart(document.getElementById('trendChart'),{type:'line',
+    data:{labels:weeks.map(w=>`${w}주`),datasets:trendMenus.map((m,i)=>({label:m,data:weeks.map(w=>D.filter(r=>r.menu===m&&r.week===w).reduce((s,r)=>s+r.qty,0)),borderColor:tColors[i],backgroundColor:'transparent',pointBackgroundColor:tColors[i],tension:.35,borderWidth:2,pointRadius:4}))},
+    options:{...CDEF}});
+
+  // ── ACTION PLAN ──
+  const topRising=rising[0];
+  const topFalling=falling[0];
+  const peakDow=dowNames[dowTotals.indexOf(Math.max(...dowTotals))];
+  const slowDow=dowNames[dowTotals.indexOf(Math.min(...dowTotals.filter(v=>v>0)))];
+  const actions=[
+    {color:'var(--green)',tag:'매출 증대',title:`${topRising?.menu||'트렌드 메뉴'} 집중 관리`,desc:`최근 ${topRising?.pct||0}% 급상승 중. 메뉴판 상단 노출 및 직원 추천 메뉴 지정 권장.`},
+    {color:'var(--amber)',tag:'리스크 방지',title:`${topFalling?.menu||'하락 메뉴'} 재고 최적화`,desc:`최근 ${Math.abs(topFalling?.pct||0)}% 감소 추세. 발주량 축소 및 프로모션 검토 필요.`},
+    {color:'var(--blue)',tag:'운영 효율',title:`${slowDow}요일 해피아워 도입`,desc:`${slowDow}요일 매출이 가장 낮음. 세트 메뉴 또는 타임세일로 집객력 강화 권장.`},
+  ];
+  document.getElementById('actionGrid').innerHTML=actions.map((a,i)=>`
+    <div class="action-card" style="border-top:2px solid ${a.color}">
+      <div class="action-num">0${i+1}</div>
+      <div class="action-tag" style="color:${a.color}">${a.tag}</div>
+      <div class="action-title">${a.title}</div>
+      <div class="action-desc">${a.desc}</div>
+    </div>`).join('');
+
+  const peakHourSlot=hmRanges[hmVals.map(row=>row.reduce((s,v)=>s+v,0)).indexOf(Math.max(...hmVals.map(row=>row.reduce((s,v)=>s+v,0))))];
+  document.getElementById('inventoryList').innerHTML=[
+    `<li>${topMenu[0]} — 가장 많이 팔리는 메뉴. 재고 소진 방지를 위해 ${peakDow}요일 전 여유분 확보 권장.</li>`,
+    topFalling?`<li>${topFalling.menu} — 최근 판매 감소세. 발주량을 점진적으로 줄여 폐기 손실 최소화.</li>`:'',
+    topRising?`<li>${topRising.menu} — 급상승 중. 주 발주량 10-20% 증량 검토.</li>`:'',
+    `<li>피크 시간대(${peakHourSlot[0]}-${peakHourSlot[1]}시) 주요 재료 사전 소분 준비.</li>`,
+  ].filter(Boolean).join('');
+  document.getElementById('opsList').innerHTML=[
+    `<li>${peakDow}요일이 가장 바쁜 요일 — 인력 집중 배치 및 사전 준비 강화.</li>`,
+    `<li>${slowDow}요일 매출 최저 — 해피아워 또는 SNS 이벤트로 집객 시도 권장.</li>`,
+    wthrTypes.length>0?`<li>날씨 ${wthrTypes[0]} 조건에서 판매량 변동 두드러짐 — 날씨 연동 발주 루틴화 검토.</li>`:'',
+    `<li>판매 TOP 5 메뉴 원가율 점검 — 고판매·저수익 메뉴 존재 시 가격 조정 테스트.</li>`,
+  ].filter(Boolean).join('');
+
+  renderHistory();
+}
+
+/* ═══════════════════════════════
+   HISTORY
+═══════════════════════════════ */
+function addHistory(file, v) {
+  const entry={id:Date.now(),filename:file.name,size:file.size,rowCount:v.rowCount,uploadedAt:new Date().toISOString(),valid:v.valid,isSample:v.sample.detected,status:v.sample.detected?'flagged':v.valid?'active':'flagged',issues:[]};
+  if(!v.cols.pass) entry.issues.push('컬럼 누락');
+  if(!v.date.pass) entry.issues.push('날짜 오류');
+  if(!v.qty.pass)  entry.issues.push('수량 오류');
+  if(v.dup.dupCount>0) entry.issues.push('중복 행');
+  if(v.sample.detected) entry.issues.push('샘플 감지');
+  if(!v.empty.pass) entry.issues.push('빈 값');
+  history.unshift(entry);
+  try{localStorage.setItem('mdash_history',JSON.stringify(history.slice(0,50).map(e=>({...e}))));}catch(e){}
+  renderHistory();
+}
+function flagCurrentAsSample(){if(history[0]){history[0].status='flagged';history[0].isSample=true;try{localStorage.setItem('mdash_history',JSON.stringify(history));}catch(e){}renderHistory();toast('샘플로 표시됨','warn');}}
+function delEntry(id){const e=history.find(x=>x.id===id);if(e){e.status='deleted';try{localStorage.setItem('mdash_history',JSON.stringify(history));}catch(e){}renderHistory();toast('삭제됨 — 복원 가능','warn');}}
+function restoreEntry(id){const e=history.find(x=>x.id===id);if(e){e.status='active';try{localStorage.setItem('mdash_history',JSON.stringify(history));}catch(e){}renderHistory();toast('복원 완료','success');}}
+function permDelete(id){history=history.filter(x=>x.id!==id);try{localStorage.setItem('mdash_history',JSON.stringify(history));}catch(e){}renderHistory();toast('영구 삭제됨','info');}
+function setFilter(f){histFilter=f;['all','ok','bad'].forEach(x=>{const btn=document.getElementById('f'+x.charAt(0).toUpperCase()+x.slice(1));if(btn)btn.style.background=x===f?'var(--accent)':'';if(btn)btn.style.color=x===f?'#0e0f11':'';});renderHistory();}
+function renderHistory(){
+  const list=document.getElementById('historyList');
+  const filtered=histFilter==='all'?history:histFilter==='ok'?history.filter(e=>e.status==='active'&&e.valid):history.filter(e=>e.status==='flagged'||e.status==='deleted');
+  if(!filtered.length){list.innerHTML=`<div style="text-align:center;padding:2.5rem 1rem;color:var(--text3);font-size:13px">업로드 이력이 없습니다</div>`;} else {
+    list.innerHTML=filtered.map(e=>{
+      const sz=e.size>1024*1024?(e.size/1024/1024).toFixed(1)+'MB':Math.round(e.size/1024)+'KB';
+      const bc=e.status==='active'&&e.valid?'b-g':e.isSample?'b-a':'b-r';
+      const bt=e.status==='deleted'?'삭제됨':e.isSample?'샘플':e.valid?'유효':'오류';
+      const rc=e.status==='deleted'?'deleted-row':e.isSample?'sample-row':'';
+      return `<div class="history-row ${rc}">
+        <div><div class="h-name">${e.filename}</div><div class="h-sub">${sz}${e.issues.length?' · '+e.issues.join(', '):''}</div></div>
+        <div style="text-align:center"><span class="badge ${bc}">${bt}</span></div>
+        <div class="h-rows">${(e.rowCount||0).toLocaleString()}</div>
+        <div class="h-date">${fmtDate(e.uploadedAt)}</div>
+        <div class="h-actions">
+          ${e.status==='deleted'?`<button class="h-btn restore" title="복원" onclick="restoreEntry(${e.id})">↩</button><button class="h-btn danger" title="영구삭제" onclick="permDelete(${e.id})">🗑</button>`
+            :`<button class="h-btn danger" title="삭제" onclick="delEntry(${e.id})">✕</button>`}
+        </div>
+      </div>`;
+    }).join('');
+  }
+  document.getElementById('sTot').textContent=history.length;
+  document.getElementById('sOk').textContent=history.filter(e=>e.status==='active'&&e.valid).length;
+  document.getElementById('sDel').textContent=history.filter(e=>e.status==='deleted').length;
+}
+
+/* ── INIT ── */
+Chart.defaults.font.family="'Noto Sans KR',sans-serif";
+Chart.defaults.color='#4e4e4a';
+renderHistory();
+</script>
+</body>
+</html>
